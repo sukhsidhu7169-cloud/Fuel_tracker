@@ -50,38 +50,17 @@ async function dbDelete(id) {
   if (!res.ok) throw new Error(await res.text());
 }
 
-// AI receipt scanning via Anthropic
+// AI receipt scanning via Vercel serverless function
 async function scanReceipt(base64Image) {
   const mediaType = base64Image.split(";")[0].split(":")[1] || "image/jpeg";
   const base64Data = base64Image.split(",")[1];
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/scan-receipt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 300,
-      messages: [{
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data: base64Data }
-          },
-          {
-            type: "text",
-            text: `Look at this fuel receipt and extract the total amount paid in dollars and the number of litres/liters purchased. 
-Respond ONLY with a JSON object like this, no other text:
-{"cost": 77.50, "liters": 45.2}
-If you cannot find one of the values, use null for that field.`
-          }
-        ]
-      }]
-    })
+    body: JSON.stringify({ base64Image: base64Data, mediaType }),
   });
-  const data = await res.json();
-  const text = data.content?.find(b => b.type === "text")?.text || "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 const emptyForm = {
