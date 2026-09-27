@@ -23,7 +23,7 @@ const BASE_HEADERS = {
 async function dbLoad() {
  
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,receipt,receipt_name,company,created_at&order=created_at.desc&limit=200
+    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,receipt,receipt_name,company,created_at&order=created_at.desc&limit=200`,
     { method: "GET", headers: BASE_HEADERS }
   );
   const text = await res.text();
