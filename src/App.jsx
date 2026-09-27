@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const SUPABASE_URL = "https://iukoqjsnlksdgmhfmmjt.supabase.co";
+const COMPANY = "17780613 Canada Inc.";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1a29xanNubGtzZGdtaGZtbWp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTc1MjEsImV4cCI6MjA5NzQ3MzUyMX0.g0okm_WNVOt0Uv_HGqVJUPPXfGec-y5YB1Q5iLAhI1M";
 const DASHBOARD_PASSWORD = "Thunderbay12";
 
@@ -21,14 +22,22 @@ const BASE_HEADERS = {
 };
 
 async function dbLoad() {
- 
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,receipt,receipt_name,company,created_at&order=created_at.desc&limit=200
+    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,company,created_at&company=eq.${encodeURIComponent(COMPANY)}&created_at=gte.${encodeURIComponent(since.toISOString())}&order=created_at.desc&limit=200`,
     { method: "GET", headers: BASE_HEADERS }
   );
   const text = await res.text();
   if (!res.ok) throw new Error(text);
   return JSON.parse(text);
+}
+
+async function dbLoadReceipt(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${encodeURIComponent(id)}&company=eq.${encodeURIComponent(COMPANY)}&select=receipt,receipt_name&limit=1`, { method: "GET", headers: BASE_HEADERS });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text);
+  return JSON.parse(text)[0] || {};
 }
 
 async function dbInsert(entry) {
@@ -43,7 +52,7 @@ async function dbInsert(entry) {
 }
 
 async function dbDelete(id) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${id}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${encodeURIComponent(id)}&company=eq.${encodeURIComponent(COMPANY)}`, {
     method: "DELETE", headers: BASE_HEADERS,
   });
   if (!res.ok) throw new Error(await res.text());
@@ -151,6 +160,7 @@ export default function FuelTracker() {
         date: form.date, driver: form.driver, van: form.van,
         liters: parseFloat(form.liters), cost: parseFloat(form.cost),
         receipt: form.receipt || null, receipt_name: form.receipt_name || null,
+        company: COMPANY,
       };
       const result = await dbInsert(entry);
       const inserted = Array.isArray(result) ? result[0] : result;
@@ -165,6 +175,15 @@ export default function FuelTracker() {
     if(!confirm("Delete this entry?")) return;
     try { await dbDelete(id); setEntries(prev=>prev.filter(e=>e.id!==id)); setView(null); }
     catch(e) { alert("Could not delete: " + e.message); }
+  }
+
+  async function handleView(entry) {
+    setView(entry);
+    if (entry.receipt) return;
+    try {
+      const receipt = await dbLoadReceipt(entry.id);
+      if (receipt.receipt) setView(current => current?.id === entry.id ? { ...current, ...receipt } : current);
+    } catch { /* details remain available even if the receipt image cannot be loaded */ }
   }
 
   function handlePasswordSubmit() {
@@ -277,7 +296,7 @@ export default function FuelTracker() {
               <div style={{marginTop:4}}>
                 <div style={{fontSize:12,fontWeight:600,color:C.muted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>Recent Entries — All Drivers</div>
                 {entries.slice(0,10).map((e,i)=>(
-                  <div key={e.id} onClick={()=>setView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div key={e.id} onClick={()=>handleView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <div>
                       <div style={{fontWeight:600,fontSize:14}}>{e.driver}</div>
                       <div style={{fontSize:12,color:C.muted,marginTop:2}}>{e.van} · {fmtDate(e.date)} · {e.liters}L</div>
@@ -375,7 +394,7 @@ export default function FuelTracker() {
                 <div>
                   <div style={{fontSize:12,fontWeight:600,color:C.muted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>All Entries ({filtered.length})</div>
                   {filtered.map((e,i)=>(
-                    <div key={e.id} onClick={()=>setView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div key={e.id} onClick={()=>handleView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <div>
                         <div style={{fontWeight:600,fontSize:14}}>{e.driver}</div>
                         <div style={{fontSize:12,color:C.muted,marginTop:2}}>{e.van} · {fmtDate(e.date)} · {e.liters}L</div>
