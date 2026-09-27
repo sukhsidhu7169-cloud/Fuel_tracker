@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const SUPABASE_URL = "https://iukoqjsnlksdgmhfmmjt.supabase.co";
+const COMPANY = "17780613 Canada Inc.";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1a29xanNubGtzZGdtaGZtbWp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTc1MjEsImV4cCI6MjA5NzQ3MzUyMX0.g0okm_WNVOt0Uv_HGqVJUPPXfGec-y5YB1Q5iLAhI1M";
 const DASHBOARD_PASSWORD = "Thunderbay12";
 
@@ -24,7 +25,7 @@ async function dbLoad() {
   const since = new Date();
   since.setDate(since.getDate() - 30);
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,company,created_at&created_at=gte.${encodeURIComponent(since.toISOString())}&order=created_at.desc&limit=200`,
+    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,company,created_at&company=eq.${encodeURIComponent(COMPANY)}&created_at=gte.${encodeURIComponent(since.toISOString())}&order=created_at.desc&limit=200`,
     { method: "GET", headers: BASE_HEADERS }
   );
   const text = await res.text();
@@ -33,7 +34,7 @@ async function dbLoad() {
 }
 
 async function dbLoadReceipt(id) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${encodeURIComponent(id)}&select=receipt,receipt_name&limit=1`, { method: "GET", headers: BASE_HEADERS });
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${encodeURIComponent(id)}&company=eq.${encodeURIComponent(COMPANY)}&select=receipt,receipt_name&limit=1`, { method: "GET", headers: BASE_HEADERS });
   const text = await res.text();
   if (!res.ok) throw new Error(text);
   return JSON.parse(text)[0] || {};
@@ -51,7 +52,7 @@ async function dbInsert(entry) {
 }
 
 async function dbDelete(id) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${id}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${encodeURIComponent(id)}&company=eq.${encodeURIComponent(COMPANY)}`, {
     method: "DELETE", headers: BASE_HEADERS,
   });
   if (!res.ok) throw new Error(await res.text());
@@ -159,6 +160,7 @@ export default function FuelTracker() {
         date: form.date, driver: form.driver, van: form.van,
         liters: parseFloat(form.liters), cost: parseFloat(form.cost),
         receipt: form.receipt || null, receipt_name: form.receipt_name || null,
+        company: COMPANY,
       };
       const result = await dbInsert(entry);
       const inserted = Array.isArray(result) ? result[0] : result;
