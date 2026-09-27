@@ -21,14 +21,22 @@ const BASE_HEADERS = {
 };
 
 async function dbLoad() {
- 
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,receipt,receipt_name,company,created_at&order=created_at.desc&limit=200`,
+    `${SUPABASE_URL}/rest/v1/fuel_entries?select=id,date,driver,van,liters,cost,company,created_at&created_at=gte.${encodeURIComponent(since.toISOString())}&order=created_at.desc&limit=200`,
     { method: "GET", headers: BASE_HEADERS }
   );
   const text = await res.text();
   if (!res.ok) throw new Error(text);
   return JSON.parse(text);
+}
+
+async function dbLoadReceipt(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/fuel_entries?id=eq.${encodeURIComponent(id)}&select=receipt,receipt_name&limit=1`, { method: "GET", headers: BASE_HEADERS });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text);
+  return JSON.parse(text)[0] || {};
 }
 
 async function dbInsert(entry) {
@@ -167,6 +175,15 @@ export default function FuelTracker() {
     catch(e) { alert("Could not delete: " + e.message); }
   }
 
+  async function handleView(entry) {
+    setView(entry);
+    if (entry.receipt) return;
+    try {
+      const receipt = await dbLoadReceipt(entry.id);
+      if (receipt.receipt) setView(current => current?.id === entry.id ? { ...current, ...receipt } : current);
+    } catch { /* details remain available even if the receipt image cannot be loaded */ }
+  }
+
   function handlePasswordSubmit() {
     if(pwInput === DASHBOARD_PASSWORD) {
       setDashUnlocked(true); setPwError(false); setPwInput("");
@@ -277,7 +294,7 @@ export default function FuelTracker() {
               <div style={{marginTop:4}}>
                 <div style={{fontSize:12,fontWeight:600,color:C.muted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>Recent Entries — All Drivers</div>
                 {entries.slice(0,10).map((e,i)=>(
-                  <div key={e.id} onClick={()=>setView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div key={e.id} onClick={()=>handleView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <div>
                       <div style={{fontWeight:600,fontSize:14}}>{e.driver}</div>
                       <div style={{fontSize:12,color:C.muted,marginTop:2}}>{e.van} · {fmtDate(e.date)} · {e.liters}L</div>
@@ -375,7 +392,7 @@ export default function FuelTracker() {
                 <div>
                   <div style={{fontSize:12,fontWeight:600,color:C.muted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>All Entries ({filtered.length})</div>
                   {filtered.map((e,i)=>(
-                    <div key={e.id} onClick={()=>setView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div key={e.id} onClick={()=>handleView(e)} style={{background:i%2===0?C.card:C.rowA,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <div>
                         <div style={{fontWeight:600,fontSize:14}}>{e.driver}</div>
                         <div style={{fontSize:12,color:C.muted,marginTop:2}}>{e.van} · {fmtDate(e.date)} · {e.liters}L</div>
